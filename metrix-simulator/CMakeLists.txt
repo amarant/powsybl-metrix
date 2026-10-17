@@ -90,6 +90,7 @@ set(METRIX_HEADERS
         src/config/version.h
         src/compute/solver.h
         src/margin_variations_compute.h
+        src/performance_metrics.h
     )
 
 set(METRIX_SOURCES 

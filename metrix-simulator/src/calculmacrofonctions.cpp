@@ -16,6 +16,7 @@
 #include "err/IoDico.h"
 #include "err/error.h"
 #include "parametres.h"
+#include "performance_metrics.h"
 #include "pne.h"
 #include "prototypes.h"
 #include "reseau.h"
@@ -200,6 +201,7 @@ void Calculer::libererJacIncidents()
 
 int Calculer::resolutionProbleme()
 {
+    performance::Timer timer("resolution_problem");
     // 1- resolution du probleme de base.
     // 2- resolution des differentes variantes
     // 2-a modification du reseau pour la prise en compte des differentes variantes:
@@ -215,12 +217,18 @@ int Calculer::resolutionProbleme()
     tauxPertes_ = res_.coeff_pertes_;
 
     // MODELISATION DODU
-    status = initJacobienne();
+    {
+        performance::Timer timer("jacobian_initialization");
+        status = initJacobienne();
+    }
     if (status != METRIX_PAS_PROBLEME) {
         LOG_ALL(error) << "probleme dans initJacobienne";
         return METRIX_PROBLEME;
     }
-    status = construireJacobienne();
+    {
+        performance::Timer timer("jacobian_construction");
+        status = construireJacobienne();
+    }
     if (status != METRIX_PAS_PROBLEME) {
         LOG_ALL(error) << "probleme dans construireJacobienne";
         return METRIX_PROBLEME;
@@ -228,7 +236,10 @@ int Calculer::resolutionProbleme()
 
     // Factoriser la jacobienne c'est la meme pour tout le probleme
     libererJacobienne();
-    jacFactorisee_ = LU_Factorisation(&jac_);
+    {
+        performance::Timer timer("lu_factorization");
+        jacFactorisee_ = LU_Factorisation(&jac_);
+    }
     if (jac_.ProblemeDeFactorisation != NON_LU) {
         LOG_ALL(error) << "probleme lors de la factorisation: LU factorization code = " << jac_.ProblemeDeFactorisation;
         return METRIX_PROBLEME;
@@ -246,6 +257,7 @@ int Calculer::resolutionProbleme()
     //--------------------------------
     auto mapVarEnd = variantesOrdonnees_.end();
     for (auto mapVar = variantesOrdonnees_.begin(); mapVar != mapVarEnd; ++mapVar) {
+        performance::add("topology_groups_processed");
         const Quadripole::SetQuadripoleSortedByName& quads = mapVar->first;
 
         LOG_RES() << "\n********************************************";
@@ -269,7 +281,10 @@ int Calculer::resolutionProbleme()
             }
 
             // Refactoriser la jacobienne
-            LU_RefactorisationSymetrique(jacFactorisee_, &jac_);
+            {
+                performance::Timer timer("lu_refactorization");
+                LU_RefactorisationSymetrique(jacFactorisee_, &jac_);
+            }
             // jacFactorisee_ = LU_Factorisation(&jac_);
             if (jac_.ProblemeDeFactorisation != NON_LU) {
                 LOG_ALL(error) << "probleme lors de la refactorisation symétrique: code = "
@@ -296,6 +311,7 @@ int Calculer::resolutionProbleme()
         auto varEnd = mapVar->second.end();
         for (auto var = mapVar->second.begin(); var != varEnd; ++var) {
             varianteCourante_ = (*var);
+            performance::VariantTimer variantTimer(varianteCourante_->num_);
 
             LOG_RES() << "\n---------------------";
             LOG_RES() << "---------------------";
@@ -393,7 +409,10 @@ int Calculer::resolutionProbleme()
             }
 
             // Refactoriser la jacobienne
-            LU_RefactorisationSymetrique(jacFactorisee_, &jac_);
+            {
+                performance::Timer timer("lu_refactorization");
+                LU_RefactorisationSymetrique(jacFactorisee_, &jac_);
+            }
             if (jac_.ProblemeDeFactorisation != NON_LU) {
                 LOG_ALL(error) << "probleme lors de la refactorisation symétrique après traitements variantes: code  = "
                                << jac_.ProblemeDeFactorisation;
@@ -411,6 +430,7 @@ int Calculer::resolutionProbleme()
 
 int Calculer::PneSolveur(TypeDeSolveur typeSolveur, const std::shared_ptr<Variante>& varianteCourante)
 {
+    performance::Timer timer("solve_setup");
     if (config::inputConfiguration().printConstraintsMatrix()) {
         printMatriceDesContraintes();
     }
@@ -454,7 +474,11 @@ int Calculer::PneSolveur(TypeDeSolveur typeSolveur, const std::shared_ptr<Varian
 
         // Resolution du probleme
         //----------------------
-        solver_.solve(&pbPNE_);
+        {
+            performance::Timer timer("solver_internal");
+            solver_.solve(&pbPNE_);
+        }
+        performance::add("solver_calls");
         pbExistenceDUneSolution_ = pbPNE_.ExistenceDUneSolution;
 
         if (pbExistenceDUneSolution_ == SOLUTION_OPTIMALE_TROUVEE
@@ -540,7 +564,11 @@ int Calculer::PneSolveur(TypeDeSolveur typeSolveur, const std::shared_ptr<Varian
             SPX_EcrireProblemeAuFormatMPS(pb_);
         }
 
-        solver_.solve(&pb_);
+        {
+            performance::Timer timer("solver_internal");
+            solver_.solve(&pb_);
+        }
+        performance::add("solver_calls");
         pbNbVarDeBaseComplementaires_ = pb_.NbVarDeBaseComplementaires;
         pbExistenceDUneSolution_ = pb_.ExistenceDUneSolution;
 
@@ -564,6 +592,7 @@ int Calculer::PneSolveur(TypeDeSolveur typeSolveur, const std::shared_ptr<Varian
 
 int Calculer::resolutionUnProblemeDodu(const std::shared_ptr<Variante>& varianteCourante)
 {
+    performance::Timer timer("variant_resolution");
     // Ce programme :
     // 1. Allocation et initialisation des tables
     // 2. calcul des coeffs de reports, pour la variante i
@@ -702,6 +731,7 @@ int Calculer::resolutionUnProblemeDodu(const std::shared_ptr<Variante>& variante
         //***************
 
         numMicroIteration_++;
+        performance::add("microiterations");
         LOG_ALL(info) << err::ioDico().msg("INFOMicroIt",
                                            c_fmt("%d", numMicroIteration_),
                                            c_fmt("%d", /*nbNewContreParVariante*/ pbNombreDeContraintes_));
@@ -733,7 +763,10 @@ int Calculer::resolutionUnProblemeDodu(const std::shared_ptr<Variante>& variante
         //**************
         int codeRet;
 
-        LU_LuSolv(jacFactorisee_, &secondMembre[0], &codeRet, nullptr, 0, 0.0);
+        {
+            performance::Timer timer("lu_solve_rhs");
+            LU_LuSolv(jacFactorisee_, &secondMembre[0], &codeRet, nullptr, 0, 0.0);
+        }
         if (codeRet != 0) {
             LOG_ALL(error) << err::ioDico().msg("ERRCalcInterne")
                            << " probleme lors de la factorisation LU pour le calcul du second membre";
@@ -761,7 +794,14 @@ int Calculer::resolutionUnProblemeDodu(const std::shared_ptr<Variante>& variante
 
         // VII- ajouter les contraintes actives
         //***********************************
+        const int constraintsBefore = nbNewContreParVariante;
         status = ajoutContraintes(existe_contrainte_active, nbNewContreParVariante, secondMembreFixe, secondMembre);
+        if (nbNewContreParVariante > constraintsBefore) {
+            performance::add("constraints_added", nbNewContreParVariante - constraintsBefore);
+        }
+        performance::maximum("max_constraints", pbNombreDeContraintes_);
+        performance::maximum("max_variables", pbNombreDeVariables_);
+        performance::maximum("max_matrix_terms", nbElmdeMatrContraint_);
         if (status != METRIX_PAS_PROBLEME) {
             LOG_ALL(error) << "probleme lors de l'ajout des contraintes";
             return status;
@@ -795,7 +835,10 @@ int Calculer::resolutionUnProblemeDodu(const std::shared_ptr<Variante>& variante
                 }
             }
             libererJacobienne();
-            jacFactorisee_ = LU_Factorisation(&jac_);
+            {
+                performance::Timer timer("lu_factorization");
+                jacFactorisee_ = LU_Factorisation(&jac_);
+            }
         }
     }
 
@@ -808,6 +851,7 @@ int Calculer::resolutionUnProblemeDodu(const std::shared_ptr<Variante>& variante
 
 int Calculer::calculReportInfluencement()
 {
+    performance::Timer timer("distribution_factors");
     // Assessment of the LODF and distribution factors
 
     // First remark : it is important to assess the factor in the following order :

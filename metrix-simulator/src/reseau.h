@@ -705,14 +705,14 @@ public:
                    bool detailsNonConnexite); /* connedtedness calculation for a given contingency or remedial action*/
     bool connexite();                         /* connedtedness calculation for the network */
 
-    int fusionner(int nZone1, int nZone2, std::map<int, int>& mapZones); /* merge two zones */
+    int fusionner(int nZone1, int nZone2, std::vector<int>& mapZones); /* merge two zones */
     int inclure(int nNoeud, int nZone, std::vector<int>& numZones);      /* include a node in a zone */
     static int creer(int nNoeud1, int nNoeud2, std::vector<int>& numZones, int nZoneCourant); /* create a new zone */
-    int mapZone(int zone, std::map<int, int>& mapZones); /* find the smallest id of connected zones */
+    int mapZone(int zone, std::vector<int>& mapZones); /* find the smallest id of connected zones */
     int traiterConnexion(int nNoeudOrg,
                          int nNoeudExt,
                          std::vector<int>& numZones,
-                         std::map<int, int>& mapZones,
+                         std::vector<int>& mapZones,
                          int numZoneCourant); /* basic treatment of a two nodes connected quadripole */
 
     void afficheSousReseau(unsigned int numNoeud, unsigned int prof); /* For debug */

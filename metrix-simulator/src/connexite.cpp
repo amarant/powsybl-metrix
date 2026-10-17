@@ -9,6 +9,7 @@
 //
 
 #include "parametres.h"
+#include "performance_metrics.h"
 
 #include <algorithm>
 #include <cmath>
@@ -46,29 +47,20 @@ using std::vector;
 //----------------------------------
 // algorithme de calcul de connexite
 //----------------------------------
-int Reseau::fusionner(int nZone1, int nZone2, map<int, int>& mapZones)
+int Reseau::fusionner(int nZone1, int nZone2, vector<int>& mapZones)
 {
-    /* fusionner les deux zones*/
+    // Les identifiants de zone sont crees de facon contigue. La racine la plus
+    // petite reste prioritaire afin de conserver la numerotation historique.
     if (nZone1 == -1 || nZone2 == -1) {
         LOG_ALL(warning) << "probleme lors de la fusion";
     }
 
-    auto iZone1 = mapZones.find(nZone1);
-    auto iZone2 = mapZones.find(nZone2);
-
-    if (iZone1 != mapZones.end()) {
-        nZone1 = mapZone(nZone1, mapZones);
-    }
-    if (iZone2 != mapZones.end()) {
-        nZone2 = mapZone(nZone2, mapZones);
-    }
-
-    if (nZone1 != nZone2) {
-        if (nZone1 < nZone2) {
-            mapZones[nZone2] = nZone1;
-        } else if (nZone1 > nZone2) {
-            mapZones[nZone1] = nZone2;
-        }
+    nZone1 = mapZone(nZone1, mapZones);
+    nZone2 = mapZone(nZone2, mapZones);
+    if (nZone1 < nZone2) {
+        mapZones[nZone2] = nZone1;
+    } else if (nZone2 < nZone1) {
+        mapZones[nZone1] = nZone2;
     }
     return METRIX_PAS_PROBLEME;
 }
@@ -94,7 +86,7 @@ int Reseau::creer(int nNoeud1, int nNoeud2, vector<int>& numZones, int nZoneCour
 }
 
 int Reseau::traiterConnexion(
-    int nNoeudOrg, int nNoeudExt, vector<int>& numZones, map<int, int>& mapZones, int numZoneCourant)
+    int nNoeudOrg, int nNoeudExt, vector<int>& numZones, vector<int>& mapZones, int numZoneCourant)
 {
     int nZoneOrg = numZones[nNoeudOrg];
     int nZoneExt = numZones[nNoeudExt];
@@ -116,41 +108,44 @@ int Reseau::traiterConnexion(
 }
 
 /** Fonction recursive qui recherche le plus petit identifiant d'une serie de zone connexes */
-int Reseau::mapZone(int zone, map<int, int>& mapZones)
+int Reseau::mapZone(int zone, vector<int>& mapZones)
 {
-    map<int, int>::iterator zoneIt;
-    if ((zoneIt = mapZones.find(zone)) == mapZones.end()) {
+    if (zone < 0 || mapZones[zone] == -1) {
         return zone;
     }
-
-    int newZone = mapZone(zoneIt->second, mapZones);
-    mapZones[zone] = newZone;
-    // cout<< "Zone " << zone << ", id = " << newZone <<endl;
-    return newZone;
+    mapZones[zone] = mapZone(mapZones[zone], mapZones);
+    return mapZones[zone];
 }
 
 std::tuple<bool, bool, std::vector<int>> Reseau::checkConnexite(bool choisiNoeudsBilan)
 {
+    performance::Timer timer("connectivity_check");
     vector<int> numZones(nbNoeuds_, -1);
-    map<int, int> mapZones;
+    vector<int> mapZones(nbNoeuds_ + 1, -1);
     int nNoeudOrg;
     int nNoeudExt;
     int numZoneCourant = 0;
 
-    for (const auto& quad_pair : quads_) {
-        const auto& quad = quad_pair.second;
+    {
+        performance::Timer timer("connectivity_quad_scan");
+        for (const auto& quad_pair : quads_) {
+            const auto& quad = quad_pair.second;
 
-        if (!quad->connecte()) {
-            continue;
+            if (!quad->connecte()) {
+                continue;
+            }
+
+            nNoeudOrg = quad->tnnorqua();
+            nNoeudExt = quad->tnnexqua();
+            numZoneCourant = traiterConnexion(nNoeudOrg, nNoeudExt, numZones, mapZones, numZoneCourant);
         }
-
-        nNoeudOrg = quad->tnnorqua();
-        nNoeudExt = quad->tnnexqua();
-        numZoneCourant = traiterConnexion(nNoeudOrg, nNoeudExt, numZones, mapZones, numZoneCourant);
     }
 
-    for (int n = 0; n < nbNoeuds_; ++n) {
-        numZones[n] = mapZone(numZones[n], mapZones);
+    {
+        performance::Timer timer("connectivity_zone_resolution");
+        for (int n = 0; n < nbNoeuds_; ++n) {
+            numZones[n] = mapZone(numZones[n], mapZones);
+        }
     }
 
     map<int, int> lienNumConnexiteEtNumeroZones;
@@ -225,6 +220,7 @@ void Reseau::correctConnexite(bool was_connexe,
                               const std::vector<int>& numZones,
                               bool detailsNonConnexite)
 {
+    performance::Timer timer("connectivity_correction");
     if (was_connexe) {
         if (icdt && icdt->parade_) {
             const auto& icdtPere = icdt->incTraiteCur_;
@@ -331,6 +327,7 @@ bool Reseau::connexite() { return connexite(nullptr, true, true); }
 
 bool Reseau::connexite(const std::shared_ptr<Incident>& icdt, bool choisiNoeudsBilan, bool detailsNonConnexite)
 {
+    performance::Timer timer("connectivity");
     /*connectedness */
     bool resultat = true;
     bool status = true; // OK

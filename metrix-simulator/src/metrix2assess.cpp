@@ -16,6 +16,7 @@
 #include "err/IoDico.h"
 #include "margin_variations_compute.h"
 #include "parametres.h"
+#include "performance_metrics.h"
 #include "pne.h"
 #include "reseau.h"
 #include "status.h"
@@ -192,6 +193,7 @@ void Calculer::printCut(FILE* fr)
 
 int Calculer::metrix2Assess(const std::shared_ptr<Variante>& var, const vector<double>& theta, int status)
 {
+    performance::Timer timer("result_report");
     FILE* fr;
 
     string nom1 = c_fmt("%s_s%d", config::inputConfiguration().filepathResults().c_str(), var->num_);
@@ -1507,6 +1509,7 @@ Calculer::getIncidentConstraint(const std::map<std::shared_ptr<Incident>, int>& 
 bool Calculer::calculVariationsMarginales(FILE* fr,
                                           const std::map<std::shared_ptr<Incident>, int>& incidentsContraignants)
 {
+    performance::Timer timer("marginal_variations");
     CostDefMap cost;
     int ctrOuvr = 0;
     vector<string> nomOu; // nom de l'ouvrage

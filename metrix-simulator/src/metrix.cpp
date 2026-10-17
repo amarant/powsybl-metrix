@@ -20,6 +20,7 @@
 #include "err/error.h"
 #include "options/options.h"
 #include "parametres.h"
+#include "performance_metrics.h"
 #include "reseau.h"
 #include "status.h"
 #include <metrix/log.h>
@@ -120,7 +121,14 @@ int main(int argc, char* argv[])
 
         try {
             // Lecture des donnees
-            res.lireDonnees();
+            {
+                performance::Timer timer("network_read");
+                res.lireDonnees();
+            }
+            performance::maximum("network_nodes", res.nbNoeuds_);
+            performance::maximum("network_quadripoles", res.nbQuads_);
+            performance::maximum("network_groups", res.nbGroupes_);
+            performance::maximum("network_incidents", res.nbIncidents_);
             time(&lect);
 
             config::VariantConfiguration variant_config(input_config.filepathVariant());
@@ -139,15 +147,22 @@ int main(int argc, char* argv[])
             }
 
             // Double-check connexity in case the base variant broke connexite
-            if (!res.connexite()) {
-                LOG(warning) << "Base variant broke the connexity";
+            {
+                performance::Timer timer("base_connectivity");
+                if (!res.connexite()) {
+                    LOG(warning) << "Base variant broke the connexity";
+                }
             }
 
             // Construction des variantes
             // To gain computation time, we gather variantes that generates the same topology, i.e. modifiy the same set
             // of quadripoles
             MapQuadinVar variantesOrdonnees;
-            res.updateVariants(variantesOrdonnees, variant_config);
+            {
+                performance::Timer timer("group_variants");
+                res.updateVariants(variantesOrdonnees, variant_config);
+            }
+            performance::maximum("topology_groups", variantesOrdonnees.size());
             time(&end);
             dif = difftime(end, lect);
 
@@ -155,7 +170,10 @@ int main(int argc, char* argv[])
 
             if (config::configuration().computationType() != config::Configuration::ComputationType::LOAD_FLOW) {
                 config::ParadesConfiguration parades_config(input_config.filepathParades());
-                res.updateParades(parades_config);
+                {
+                    performance::Timer timer("update_parades");
+                    res.updateParades(parades_config);
+                }
 
                 time(&lect);
                 dif = difftime(lect, end);
@@ -210,6 +228,9 @@ int main(int argc, char* argv[])
         dif = difftime(end, start);
 
         LOG(info) << "Execution time: " << dif << metrix::log::sync;
+        if (performance::enabled()) {
+            std::cerr << performance::report();
+        }
     } catch (const std::exception& e) {
         std::cerr << e.what(); // add to cerr also because print on stdout is disabled by default and exception can
                                // occurs before logger initialization

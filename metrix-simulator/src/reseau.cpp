@@ -29,11 +29,11 @@
 #include "err/IoDico.h"
 #include "err/error.h"
 #include "parametres.h"
+#include "performance_metrics.h"
 #include "prototypes.h"
 #include "reseau.h"
 #include "status.h"
 #include "variante.h"
-
 
 using cte::c_fmt;
 
@@ -3110,19 +3110,23 @@ void Reseau::updateVariant(MapQuadinVar& mapping, const config::VariantConfigura
         }
     }
 
-    for (const auto& group : config.randomGroups) {
-        auto groupesIt = groupes_.find(group);
-        if (groupesIt != groupes_.end()) {
-            variant->randomGroups_.push_back(groupesIt->second);
-        } else {
-            throw ErrorI(err::ioDico().msg("ERRGrpRandomDifferentGrp", c_fmt("%d", variant->num_)));
+    {
+        performance::Timer timer("random_group_coverage");
+        performance::maximum("random_group_names", config.randomGroups.size());
+        std::unordered_set<const Groupe*> randomGroupMembers;
+        if (!config.randomGroups.empty()) {
+            randomGroupMembers.reserve(config.randomGroups.size());
         }
-    }
-    if (!config.randomGroups.empty()){
-        for (const auto& group : groupes_){
-            if (std::find(config.randomGroups.begin(), config.randomGroups.end(), group.first) == config.randomGroups.end()){
+        for (const auto& group : config.randomGroups) {
+            auto groupesIt = groupes_.find(group);
+            if (groupesIt == groupes_.end()) {
                 throw ErrorI(err::ioDico().msg("ERRGrpRandomDifferentGrp", c_fmt("%d", variant->num_)));
             }
+            variant->randomGroups_.push_back(groupesIt->second);
+            randomGroupMembers.insert(groupesIt->second.get());
+        }
+        if (!config.randomGroups.empty() && randomGroupMembers.size() != groupes_.size()) {
+            throw ErrorI(err::ioDico().msg("ERRGrpRandomDifferentGrp", c_fmt("%d", variant->num_)));
         }
     }
 
