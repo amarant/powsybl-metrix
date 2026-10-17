@@ -577,6 +577,7 @@ class Reseau
 
 public:
     Reseau() { random.seed(1); };
+    ~Reseau();
 
     void updateBase(const config::VariantConfiguration::VariantConfig& config);
     void updateVariants(MapQuadinVar& mapping, const config::VariantConfiguration& config);

@@ -20,6 +20,7 @@
 
 #include <cmath>
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -449,7 +450,6 @@ int Calculer::calculeInvB(const std::shared_ptr<Incident>& icdt,
                           vector<vector<double>>& invB) const
 {
     MATRICE_A_FACTORISER B;
-    MATRICE* Bptr;
 
     B.NombreDeColonnes = nbColones;
     B.UtiliserLesSuperLignes = NON_LU;
@@ -464,8 +464,8 @@ int Calculer::calculeInvB(const std::shared_ptr<Incident>& icdt,
     B.NbTermesDesColonnes = &BNbTermesDesColonnes[0];
     B.ValeurDesTermesDeLaMatrice = &BValeurDesTermesDeLaMatrice[0];
     B.IndicesDeLigne = &BIndicesDeLigne[0];
-    Bptr = LU_Factorisation(&B);
-    if (B.ProblemeDeFactorisation != NON_LU) {
+    std::unique_ptr<MATRICE, decltype(&LU_LibererMemoireLU)> Bptr(LU_Factorisation(&B), &LU_LibererMemoireLU);
+    if (B.ProblemeDeFactorisation != NON_LU || Bptr == nullptr) {
         icdt->validite_ = false;
         LOG_ALL(error) << err::ioDico().msg("WARNIncidentRompantConnexiteLU", icdt->nom_);
         return METRIX_PAS_PROBLEME;
@@ -475,12 +475,11 @@ int Calculer::calculeInvB(const std::shared_ptr<Incident>& icdt,
     int codeRet = OUI_LU;
     for (int i = 0; i < nbColones; ++i) {
         invB[i][i] = 1;
-        LU_LuSolv(Bptr, &invB[i][0], &codeRet, nullptr, 0, 0.0);
+        LU_LuSolv(Bptr.get(), &invB[i][0], &codeRet, nullptr, 0, 0.0);
         if (codeRet != NON_LU) {
             return METRIX_PROBLEME;
         }
     }
-    LU_LibererMemoireLU(Bptr);
     return METRIX_PAS_PROBLEME;
 }
 

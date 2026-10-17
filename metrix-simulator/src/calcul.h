@@ -250,6 +250,8 @@ public:
     MapQuadinVar& variantesOrdonnees_;
     MATRICE_A_FACTORISER jac_;
     MATRICE* jacFactorisee_ = nullptr;
+    void libererJacobienne();
+    void libererJacIncidents();
     PROBLEME_SIMPLEXE pb_;
     PROBLEME_A_RESOUDRE pbPNE_;
     bool problemeAlloue_ = false;
@@ -265,6 +267,9 @@ public:
     bool calculVariationsMarginales(FILE* fr, const std::map<std::shared_ptr<Incident>, int>& incidentsContraignants);
     static double round(double x, double prec); // utiliser pour arrondir les calculs
     Calculer(Reseau& res, MapQuadinVar& variantesOrdonnees);
+    ~Calculer();
+    Calculer(const Calculer&) = delete;
+    Calculer& operator=(const Calculer&) = delete;
     int PneSolveur(TypeDeSolveur typeSolveur, const std::shared_ptr<Variante>& varianteCourante);
     void comput_ParticipationGrp(const std::shared_ptr<Incident>& icdt) const;
     void fixerVariablesEntieres(); // Fixe les variables entieres pour lancement avec SPX

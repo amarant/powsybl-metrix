@@ -13,6 +13,7 @@
 #include <metrix/log.h>
 
 #include <algorithm>
+#include <stdexcept>
 
 MarginVariationMatrix::MarginVariationMatrix(int nbConstraints,
                                              int nbComplementaryVar,
@@ -48,6 +49,9 @@ MarginVariationMatrix::~MarginVariationMatrix()
 {
     if (numericMatrix_ != nullptr) {
         klu_free_numeric(&numericMatrix_, &commonParameters_);
+    }
+    if (symbolicMatrix_ != nullptr) {
+        klu_free_symbolic(&symbolicMatrix_, &commonParameters_);
     }
 }
 
@@ -164,10 +168,17 @@ void MarginVariationMatrix::init(int nbConstraints,
     klu_defaults(&commonParameters_);
     // call to klu_analyze: klu_analyze(n, Ap, Ai,common);
     symbolicMatrix_ = klu_analyze(nz_, BNonZeroStartingIndexColumns.data(), BLineIndex_.data(), &commonParameters_);
+    if (symbolicMatrix_ == nullptr) {
+        throw std::runtime_error("KLU symbolic analysis failed");
+    }
     // call to klu_factor(Ap, Ai, Ax, Symbolic, &Common)
     numericMatrix_ = klu_factor(BNonZeroStartingIndexColumns.data(),
                                 BLineIndex_.data(),
                                 BMatrixNonZeroTerms.data(),
                                 symbolicMatrix_,
                                 &commonParameters_);
+    if (numericMatrix_ == nullptr) {
+        klu_free_symbolic(&symbolicMatrix_, &commonParameters_);
+        throw std::runtime_error("KLU numeric factorization failed");
+    }
 }

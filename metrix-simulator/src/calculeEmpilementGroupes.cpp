@@ -182,7 +182,7 @@ int Calculer::empilementEconomiqueDesGroupes(const std::shared_ptr<Variante>& va
     status = PneSolveur(UTILISATION_SIMPLEXE, varianteCourante);
     if (status == METRIX_PROBLEME) {
         LOG_ALL(error) << err::ioDico().msg("ERRAppelSpx");
-        LU_LibererMemoireLU(jacFactorisee_);
+        libererJacobienne();
         return status;
     }
     if (status == METRIX_PAS_SOLUTION) {
