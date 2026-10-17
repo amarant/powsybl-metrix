@@ -25,9 +25,15 @@ build_metrix() (
     exit 1
   fi
 
+  c_flags=${CFLAGS:-}
   cxx_flags=${CXXFLAGS:-}
+  if [[ "$name" == *-native ]]; then
+    c_flags="${c_flags:+$c_flags }-march=native"
+    cxx_flags="${cxx_flags:+$cxx_flags }-march=native"
+  fi
+
   link_flags=
-  if [[ "$name" == clang ]]; then
+  if [[ "$cxx" == clang++ ]]; then
     gcc_cxx=$(command -v g++-16)
     gcc_install_dir=${CLANG_GCC_INSTALL_DIR:-$(dirname "$("$gcc_cxx" -print-libgcc-file-name)")}
     gcc_install_dir=$(realpath "$gcc_install_dir")
@@ -47,20 +53,31 @@ build_metrix() (
     link_flags="$link_flags -Wl,-rpath,$brew_prefix/lib/gcc/current -Wl,-rpath,$brew_prefix/lib"
   fi
 
+  external_c_flags=$c_flags
+  if [[ "$name" == *-native ]]; then
+    # Sirius changes rounded results when GCC contracts floating-point operations.
+    external_c_flags="${external_c_flags:+$external_c_flags }-ffp-contract=off"
+  fi
+  if [[ "$cc" == gcc-16 ]]; then
+    external_c_flags="${external_c_flags:+$external_c_flags }-Wno-error=incompatible-pointer-types"
+  fi
   simulator_cxx_flags="${cxx_flags:+$cxx_flags }-Wno-error=unused-but-set-variable"
 
   cmake -S metrix-simulator/external -B "$dir/external" \
     -DCMAKE_C_COMPILER="$CC" \
     -DCMAKE_CXX_COMPILER="$CXX" \
+    -DCMAKE_C_FLAGS="$external_c_flags" \
     -DCMAKE_CXX_FLAGS="$cxx_flags" \
     -DCMAKE_EXE_LINKER_FLAGS="$link_flags" \
     -DCMAKE_SHARED_LINKER_FLAGS="$link_flags" \
+    -DFORCE_BUILD_SIRIUS=ON \
     -DCMAKE_BUILD_TYPE=Release
   cmake --build "$dir/external" --parallel 2
 
   cmake -S metrix-simulator -B "$dir" \
     -DCMAKE_C_COMPILER="$CC" \
     -DCMAKE_CXX_COMPILER="$CXX" \
+    -DCMAKE_C_FLAGS="$c_flags" \
     -DCMAKE_CXX_FLAGS="$simulator_cxx_flags" \
     -DCMAKE_EXE_LINKER_FLAGS="$link_flags" \
     -DCMAKE_SHARED_LINKER_FLAGS="$link_flags" \
@@ -73,12 +90,20 @@ build_metrix() (
 case ${1:-all} in
   gcc16) build_metrix gcc16 gcc-16 g++-16 ;;
   clang) build_metrix clang clang clang++ ;;
+  gcc16-native) build_metrix gcc16-native gcc-16 g++-16 ;;
+  clang-native) build_metrix clang-native clang clang++ ;;
+  native)
+    build_metrix gcc16-native gcc-16 g++-16
+    build_metrix clang-native clang clang++
+    ;;
   all)
     build_metrix gcc16 gcc-16 g++-16
     build_metrix clang clang clang++
+    build_metrix gcc16-native gcc-16 g++-16
+    build_metrix clang-native clang clang++
     ;;
   *)
-    echo "Usage : $0 [gcc16|clang|all]" >&2
+    echo "Usage : $0 [gcc16|clang|gcc16-native|clang-native|native|all]" >&2
     exit 2
     ;;
 esac

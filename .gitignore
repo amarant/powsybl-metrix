@@ -40,3 +40,5 @@ metrix-simulator/build-asan/
 metrix-simulator/build-perf/
 metrix-simulator/build-gcc16/
 metrix-simulator/build-clang/
+metrix-simulator/build-gcc16-native/
+metrix-simulator/build-clang-native/
