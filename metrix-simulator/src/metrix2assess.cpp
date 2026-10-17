@@ -25,10 +25,12 @@
 #include <cmath>
 #include <cstdio>
 #include <iostream>
+#include <list>
 #include <algorithm>
 #include <cctype>
 #include <numeric>
 #include <string>
+#include <tuple>
 
 using cte::c_fmt;
 

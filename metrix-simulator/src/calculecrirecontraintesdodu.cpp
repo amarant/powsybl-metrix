@@ -1390,7 +1390,6 @@ int Calculer::ecrireCoupeTransit(const double& maxTprev,
     // Calcul des coefficients de la contrainte
 
     double tmpSecondMembre = 0.0;
-    int coupe = 0;
 
     if (ctre->ctrSup_) {
         // borne sup
@@ -1408,7 +1407,6 @@ int Calculer::ecrireCoupeTransit(const double& maxTprev,
                 if (fabs(coefs_[j]) < config::constants::epsilon_coupe) {
                     coefs_[j] = 0.0;
                     // tmpSecondMembre -= coefs_[j]*pbX_[j];
-                    coupe++;
                 } else {
                     coefs_[j] = round(coefs_[j], config::constants::constraints_precision);
                 }
@@ -1429,7 +1427,6 @@ int Calculer::ecrireCoupeTransit(const double& maxTprev,
                 if (fabs(coefs_[j]) < config::constants::epsilon_coupe) {
                     coefs_[j] = 0.0;
                     // tmpSecondMembre += coefs_[j]*pbX_[j];
-                    coupe++;
                 } else {
                     coefs_[j] = -round(coefs_[j], config::constants::constraints_precision);
                 }
@@ -3651,7 +3648,7 @@ int Calculer::ajoutContraintes(bool& existe_contrainte_active,
             std::cerr << "Erreur lors de l'ouverture du fichier: " << filename << std::endl;
         }
     }
-    std::unique_ptr<FILE, decltype(&fclose)> fileGuard(fr, &fclose);
+    std::unique_ptr<FILE, int (*)(FILE*)> fileGuard(fr, &fclose);
     int codeRet = 1;
 
     std::set<std::shared_ptr<Incident>> paradesActiveesDansMicroiteration;

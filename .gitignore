@@ -38,3 +38,5 @@ build-docs/
 ### ASAN (AddressSanitizer) Build ###
 metrix-simulator/build-asan/
 metrix-simulator/build-perf/
+metrix-simulator/build-gcc16/
+metrix-simulator/build-clang/

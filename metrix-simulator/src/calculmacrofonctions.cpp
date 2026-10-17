@@ -1092,7 +1092,7 @@ void Calculer::assessAndPrintPTDF(const string& PTDFfileName)
     if (file == nullptr) {
         throw ErrorI(err::ioDico().msg("ERRPbOuvertureFic", PTDFfileName));
     }
-    std::unique_ptr<FILE, decltype(&fclose)> fileGuard(file, &fclose);
+    std::unique_ptr<FILE, int (*)(FILE*)> fileGuard(file, &fclose);
     LOG(debug) << "PTDF matrix creation";
     vector<string> noms;
     noms.resize(res_.nbVarGroupes_ + res_.nbVarConsos_);
@@ -1157,7 +1157,7 @@ void Calculer::printLODF(const string& LODFfileName, bool writeLODFfile) const
         if (file == nullptr) {
             throw ErrorI(err::ioDico().msg("ERRPbOuvertureFic", LODFfileName));
         }
-        std::unique_ptr<FILE, decltype(&fclose)> fileGuard(file, &fclose);
+        std::unique_ptr<FILE, int (*)(FILE*)> fileGuard(file, &fclose);
         LOG_ALL(debug) << "LODF matrix creation";
 
         fprintf(file, "BRANCH;");
