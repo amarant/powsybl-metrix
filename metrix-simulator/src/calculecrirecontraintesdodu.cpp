@@ -16,6 +16,7 @@
 #include "err/IoDico.h"
 #include "err/error.h"
 #include "pne.h"
+#include "performance_metrics.h"
 #include "prototypes.h"
 #include "reseau.h"
 #include "status.h"
@@ -88,6 +89,7 @@ bool estEnDepassementAvantManoeuvre(const std::shared_ptr<ElementASurveiller>& e
 
 int Calculer::allocationProblemeDodu()
 {
+    performance::Timer timer("problem_allocation");
     // ---------------------1/3-----------------------------------
     // nombre de Variables (dans lordre du vecteur des inconnues) =
     // 2*nombre de groupes +
@@ -821,6 +823,7 @@ int Calculer::ecrireEquationBilanCuratif(
 
 int Calculer::ecrireContraintesDodu()
 {
+    performance::Timer timer("initial_constraints");
     int status = METRIX_PAS_PROBLEME;
 
     // 2/5 contraintes de bords sur les groupes
@@ -883,6 +886,7 @@ int Calculer::ecrireContraintesDodu()
 
 int Calculer::initJacobienne()
 {
+    performance::Timer timer("jacobian_init_detail");
     // initialisation de la jacobienne
     jac_.NombreDeColonnes = res_.nbNoeuds_;
     jac_.ContexteDeLaFactorisation = LU_GENERAL;
@@ -1216,6 +1220,7 @@ double Calculer::deltaEODPoche(const std::shared_ptr<PochePerdue>& poche)
 
 int Calculer::construireJacobienne()
 {
+    performance::Timer timer("jacobian_build_detail");
     // ATTENTION : Construction de la jacobienne avec :
     // 1- elimination de la derniere injection
     // 2- remplacement de cette derniere par une phase.
@@ -2174,6 +2179,7 @@ double Calculer::transitSurQuadIncidentNonConnexe(const std::shared_ptr<Quadripo
 
 int Calculer::detectionContraintes(const std::vector<double>& secondMembre /*phase*/, bool& existe_contrainte_active)
 {
+    performance::Timer timer("detect_constraints");
     double minT;
     double maxT;
     double tran;
@@ -3613,6 +3619,7 @@ int Calculer::ajoutContraintes(bool& existe_contrainte_active,
                                const std::vector<double>& secondMembreFixe,
                                const std::vector<double>& theta)
 {
+    performance::Timer timer("add_constraints");
     if (!existe_contrainte_active) {
         LOG_ALL(info) << err::ioDico().msg("INFOPasDeContraintes");
         return METRIX_PAS_PROBLEME;
