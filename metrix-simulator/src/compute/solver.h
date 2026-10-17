@@ -17,6 +17,11 @@ namespace compute
 class Solver
 {
 public:
+    ~Solver() { free(); }
+    Solver() = default;
+    Solver(const Solver&) = delete;
+    Solver& operator=(const Solver&) = delete;
+
     void solve(PROBLEME_A_RESOUDRE* pne_problem);
     void solve(PROBLEME_SIMPLEXE* spx_problem);
 

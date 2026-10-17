@@ -28,6 +28,7 @@
 #include <fstream> //attention
 #include <iomanip>
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -173,6 +174,30 @@ Calculer::Calculer(Reseau& res, MapQuadinVar& variantesOrdonnees) : res_(res), v
     nbCtr_ = 0;
 }
 
+Calculer::~Calculer()
+{
+    libererJacIncidents();
+    libererJacobienne();
+}
+
+void Calculer::libererJacobienne()
+{
+    if (jacFactorisee_ != nullptr) {
+        LU_LibererMemoireLU(jacFactorisee_);
+        jacFactorisee_ = nullptr;
+    }
+}
+
+void Calculer::libererJacIncidents()
+{
+    for (const auto& pair : jacIncidentsModifies_) {
+        if (pair.second != nullptr) {
+            LU_LibererMemoireLU(pair.second);
+        }
+    }
+    jacIncidentsModifies_.clear();
+}
+
 int Calculer::resolutionProbleme()
 {
     // 1- resolution du probleme de base.
@@ -202,6 +227,7 @@ int Calculer::resolutionProbleme()
     }
 
     // Factoriser la jacobienne c'est la meme pour tout le probleme
+    libererJacobienne();
     jacFactorisee_ = LU_Factorisation(&jac_);
     if (jac_.ProblemeDeFactorisation != NON_LU) {
         LOG_ALL(error) << "probleme lors de la factorisation: LU factorization code = " << jac_.ProblemeDeFactorisation;
@@ -253,10 +279,7 @@ int Calculer::resolutionProbleme()
             }
 
             // Suppression des autres jacobiennes (pour les incidents rompant la connexité)
-            for (const auto& pair : jacIncidentsModifies_) {
-                LU_LibererMemoireLU(pair.second);
-            }
-            jacIncidentsModifies_.clear();
+            libererJacIncidents();
         }
 
         // LODFs (line outage distribution factors) and PTDFs (power transfer distrbution factors) assessment and print
@@ -311,7 +334,7 @@ int Calculer::resolutionProbleme()
 
                 if (status == METRIX_PROBLEME) {
                     LOG_ALL(error) << "probleme dans resolutionUnProblemeDodu";
-                    LU_LibererMemoireLU(jacFactorisee_);
+                    libererJacobienne();
                     return METRIX_PROBLEME;
                 }
 
@@ -348,7 +371,7 @@ int Calculer::resolutionProbleme()
             if (res_.resetReseau(varianteCourante_, (nbCalculs > 0)) != METRIX_PAS_PROBLEME) {
                 LOG_ALL(error) << "probleme lors de la modification de reseau par la variante numero : "
                                << varianteCourante_->num_;
-                LU_LibererMemoireLU(jacFactorisee_);
+                libererJacobienne();
                 return METRIX_PROBLEME;
             }
         } // fin variantes de même clé
@@ -380,7 +403,7 @@ int Calculer::resolutionProbleme()
         }
     } // fin des variantes de l'ensemble de la map
 
-    LU_LibererMemoireLU(jacFactorisee_);
+    libererJacobienne();
 
     return METRIX_PAS_PROBLEME;
 }
@@ -771,6 +794,7 @@ int Calculer::resolutionUnProblemeDodu(const std::shared_ptr<Variante>& variante
                     check_bonneDetectionTouteContrainte(icdt, injectionSNodales, secMembFixe);
                 }
             }
+            libererJacobienne();
             jacFactorisee_ = LU_Factorisation(&jac_);
         }
     }
@@ -1024,6 +1048,7 @@ void Calculer::assessAndPrintPTDF(const string& PTDFfileName)
     if (file == nullptr) {
         throw ErrorI(err::ioDico().msg("ERRPbOuvertureFic", PTDFfileName));
     }
+    std::unique_ptr<FILE, decltype(&fclose)> fileGuard(file, &fclose);
     LOG(debug) << "PTDF matrix creation";
     vector<string> noms;
     noms.resize(res_.nbVarGroupes_ + res_.nbVarConsos_);
@@ -1077,7 +1102,6 @@ void Calculer::assessAndPrintPTDF(const string& PTDFfileName)
         }
         fprintf(file, "\n");
     }
-    fclose(file);
 }
 
 void Calculer::printLODF(const string& LODFfileName, bool writeLODFfile) const
@@ -1089,6 +1113,7 @@ void Calculer::printLODF(const string& LODFfileName, bool writeLODFfile) const
         if (file == nullptr) {
             throw ErrorI(err::ioDico().msg("ERRPbOuvertureFic", LODFfileName));
         }
+        std::unique_ptr<FILE, decltype(&fclose)> fileGuard(file, &fclose);
         LOG_ALL(debug) << "LODF matrix creation";
 
         fprintf(file, "BRANCH;");
@@ -1132,6 +1157,5 @@ void Calculer::printLODF(const string& LODFfileName, bool writeLODFfile) const
             }
             fprintf(file, "\n");
         }
-        fclose(file);
     }
 }

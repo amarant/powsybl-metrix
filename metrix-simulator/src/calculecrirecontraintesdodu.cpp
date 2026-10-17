@@ -25,6 +25,7 @@
 #include <cmath>
 #include <iomanip>
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -3643,6 +3644,7 @@ int Calculer::ajoutContraintes(bool& existe_contrainte_active,
             std::cerr << "Erreur lors de l'ouverture du fichier: " << filename << std::endl;
         }
     }
+    std::unique_ptr<FILE, decltype(&fclose)> fileGuard(fr, &fclose);
     int codeRet = 1;
 
     std::set<std::shared_ptr<Incident>> paradesActiveesDansMicroiteration;
@@ -3679,7 +3681,7 @@ int Calculer::ajoutContraintes(bool& existe_contrainte_active,
                     LOG(debug) << "Ouvrage en contrainte deconnecte par la parade : "
                                << contrainte->elemAS_->nom_ + " / " + parade->nom_;
 
-                    if (config::inputConfiguration().writeConstraintsFile()) {
+                    if (fr != nullptr) {
                         fprintf(
                             fr,
                             "Cur : N/A; Transit = %8.3f; MaxT = 99999; MinT = 99999; ElemAS = %s (%d); nomQicdt = %s "
@@ -3779,7 +3781,7 @@ int Calculer::ajoutContraintes(bool& existe_contrainte_active,
                 if (codeRet == METRIX_PAS_PROBLEME) {
                     // La contrainte a vraiment ete ajoutee
 
-                    if (config::inputConfiguration().writeConstraintsFile()) {
+                    if (fr != nullptr) {
                         fprintf(fr,
                                 "Cur : %d; Transit = %8.3f; MaxT = %8.3f; MinT =%8.3f;  ElemAS = %s (%d); nomQicdt = "
                                 "%s (%d)\n",
@@ -3846,7 +3848,7 @@ int Calculer::ajoutContraintes(bool& existe_contrainte_active,
                     if (codeRet == METRIX_PAS_PROBLEME) {
                         // La contrainte a vraiment ete ajoutee
 
-                        if (config::inputConfiguration().writeConstraintsFile()) {
+                        if (fr != nullptr) {
                             fprintf(
                                 fr,
                                 "Cur : %d; Transit = %8.3f; MaxT = %8.3f; MinT =%8.3f;  ElemAS = %s (%d); nomQicdt = "
@@ -3905,7 +3907,7 @@ int Calculer::ajoutContraintes(bool& existe_contrainte_active,
                         cptAll++; // compteur par microiteration
                         existe_contrainte_active = true;
 
-                        if (config::inputConfiguration().writeConstraintsFile()) {
+                        if (fr != nullptr) {
                             string typeInc = contrainte->typeDeContrainteToString();
 
                             fprintf(
@@ -3965,7 +3967,7 @@ int Calculer::ajoutContraintes(bool& existe_contrainte_active,
                         cptAll++; // compteur par microiteration
                         existe_contrainte_active = true;
 
-                        if (config::inputConfiguration().writeConstraintsFile()) {
+                        if (fr != nullptr) {
                             string typeInc = contrainte->typeDeContrainteToString();
 
                             fprintf(
@@ -4006,7 +4008,7 @@ int Calculer::ajoutContraintes(bool& existe_contrainte_active,
                 return codeRet;
             }
 
-            if (config::inputConfiguration().writeConstraintsFile()) {
+            if (fr != nullptr) {
                 string typeInc = contrainte->typeDeContrainteToString();
                 string numContrainte = contrainte->num_ == -1 ? "IGNOREE" : c_fmt("%d", contrainte->num_);
 
@@ -4032,10 +4034,6 @@ int Calculer::ajoutContraintes(bool& existe_contrainte_active,
 
     if (cptAll == 0) {
         existe_contrainte_active = false;
-    }
-
-    if (config::inputConfiguration().writeConstraintsFile()) {
-        fclose(fr);
     }
 
     nbNewContreParVariante += cpt;
@@ -4489,6 +4487,7 @@ void Calculer::compareLoadFlowReport()
             }
         }
     }
+    libererJacobienne();
     jacFactorisee_ = LU_Factorisation(&jac_);
 }
 

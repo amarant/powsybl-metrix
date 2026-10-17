@@ -15,7 +15,7 @@
 #include <amd.h>
 #include <exception>
 #include <klu.h>
-#include <sstream>
+#include <string>
 #include <vector>
 
 /**
@@ -38,8 +38,8 @@ public:
     ~MarginVariationMatrix();
     MarginVariationMatrix(const MarginVariationMatrix&) = delete;
     MarginVariationMatrix& operator=(MarginVariationMatrix&) = delete;
-    MarginVariationMatrix(MarginVariationMatrix&&) = default;
-    MarginVariationMatrix& operator=(MarginVariationMatrix&&) = default;
+    MarginVariationMatrix(MarginVariationMatrix&&) = delete;
+    MarginVariationMatrix& operator=(MarginVariationMatrix&&) = delete;
 
     klu_numeric* nMatrix() const { return numericMatrix_; }
     klu_symbolic* sMatrix() const { return symbolicMatrix_; }
@@ -51,16 +51,15 @@ public:
      * @brief Special exceptions thrown in constructor
      */
     struct Exception : public std::exception {
-        explicit Exception(int info) : info{info} {}
-
-        const char* what() const noexcept final
+        explicit Exception(int info) :
+            info{info}, message{"Number of constraints is different from base size " + std::to_string(info)}
         {
-            std::stringstream ss;
-            ss << "Number of constraints is different from base size " << info;
-            return ss.str().c_str();
         }
 
+        const char* what() const noexcept final { return message.c_str(); }
+
         int info;
+        std::string message;
     };
 
     int convertConstraintIndex(int num) const;

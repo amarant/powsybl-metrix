@@ -154,6 +154,31 @@ void Reseau::update_with_configuration()
 //--------------------
 // Reseau::interfaceDIE
 //--------------------
+Reseau::~Reseau()
+{
+    // Break ownership cycles while the network still owns every populated object.
+    for (const auto& incident : incidentsEtParades_) {
+        if (incident != nullptr) {
+            incident->parades_.clear();
+            incident->paradeAuto_.reset();
+            incident->incTraiteCur_.reset();
+            incident->contraintesAutorisees_.clear();
+        }
+    }
+    for (const auto& entry : quads_) {
+        if (entry.second != nullptr) {
+            entry.second->td_.reset();
+            entry.second->elemAS_.reset();
+        }
+    }
+    for (const auto& node : noeuds_) {
+        if (node != nullptr) {
+            node->listeTd_.clear();
+            node->listeCC_.clear();
+        }
+    }
+}
+
 void Reseau::lireDonnees()
 {
     const auto& config = config::configuration();
@@ -559,9 +584,15 @@ void Reseau::lireDonnees()
             trdembanDIE = config.trdembanDIE()[i];
         }
 
+        // Certains jeux de donnees omettent le type ou donnent un indice invalide.
+        // -1 signifie "sans type" pour les rapports par filiere.
+        const int typeDeclare = i < config.trtypgrpDIE().size() ? config.trtypgrpDIE()[i] : -1;
+        const int grpType = typeDeclare >= 0 && static_cast<int>(config.trnomtypDIE().size()) > typeDeclare
+                                ? typeDeclare
+                                : -1;
         string grpTypeStr = "";
-        if(static_cast<unsigned int>(config.trtypgrpDIE().size()) > i && config.trtypgrpDIE()[i] >= 0 && static_cast<int>(config.trnomtypDIE().size()) > config.trtypgrpDIE()[i]) {
-            grpTypeStr = config.trnomtypDIE()[config.trtypgrpDIE()[i]];
+        if (grpType >= 0) {
+            grpTypeStr = config.trnomtypDIE()[grpType];
             std::transform(grpTypeStr.begin(), grpTypeStr.end(), grpTypeStr.begin(),
                 [](unsigned char c) { return std::toupper(c); });
             rtrim(grpTypeStr);
@@ -569,7 +600,7 @@ void Reseau::lireDonnees()
         auto prod = std::make_shared<Groupe>(i,
                                              nomGroupe,
                                              noeuds_[indNoeudRaccord],
-                                             config.trtypgrpDIE()[i],
+                                             grpType,
                                              config.sppactgtDIE()[i],
                                              config.trpuiminDIE()[i],
                                              config.trvalpmdDIE()[i],
